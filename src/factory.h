@@ -23,6 +23,19 @@ class Buffer {
     uint32_t size_;
 };
 
+class Image {
+  public:
+    Image(const Context& cx, VkImageType image_type, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage);
+    ~Image();
+    operator VkImage() const { return handle_; }
+
+    const Context& cx_;
+    VkImage handle_;
+    VkImageView view_;
+    VkDeviceMemory memory_;
+    VkImageLayout layout_;
+};
+
 class DescriptorSet {
   public:
     DescriptorSet(const Context& cx);
@@ -30,6 +43,7 @@ class DescriptorSet {
     operator VkDescriptorSet() const { return handle_; }
 
     void Update(uint32_t binding, VkBuffer buffer, VkDeviceSize range = VK_WHOLE_SIZE);
+    void Update(uint32_t binding, vct::Image& image);
 
     const Context& cx_;
     VkDescriptorSet handle_;

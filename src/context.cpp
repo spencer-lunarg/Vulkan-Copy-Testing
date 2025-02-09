@@ -37,9 +37,11 @@ bool Context::Setup() {
     vkb::PhysicalDeviceSelector selector{instance_};
     selector.set_minimum_version(1, 3).defer_surface_initialization();
     selector.add_required_extension("VK_KHR_maintenance5");
-    VkPhysicalDeviceMaintenance5Features maintenance5_features = vku::InitStructHelper();
-    maintenance5_features.maintenance5 = true;
-    selector.add_required_extension_features(maintenance5_features);
+    VkPhysicalDeviceMaintenance5Features features_maintenance5 = vku::InitStructHelper();
+    features_maintenance5.maintenance5 = true;
+    VkPhysicalDeviceVulkan13Features features_13 = vku::InitStructHelper();
+    features_13.synchronization2 = true;
+    selector.add_required_extension_features(features_maintenance5).set_required_features_13(features_13);
     auto phys_ret = selector.select();
     if (!phys_ret) {
         std::cerr << phys_ret.error().message() << "\n";
@@ -118,8 +120,43 @@ void Context::Submit() {
     dt_.queueWaitIdle(queue_);
 }
 
+void Context::SetLayout(vct::Image& image, VkImageLayout new_layout) {
+    if (image.layout_ == new_layout) return;
+    BeginCmd();
+
+    VkImageMemoryBarrier2 image_barrier = vku::InitStructHelper();
+    image_barrier.srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    image_barrier.srcAccessMask = 0;
+    image_barrier.dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    image_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    image_barrier.oldLayout = image.layout_;
+    image_barrier.newLayout = new_layout;
+    image_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_barrier.image = image;
+    image_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    VkDependencyInfo dependency_info = vku::InitStructHelper();
+    dependency_info.dependencyFlags = 0;
+    dependency_info.bufferMemoryBarrierCount = 0;
+    dependency_info.memoryBarrierCount = 0;
+    dependency_info.imageMemoryBarrierCount = 1;
+    dependency_info.pImageMemoryBarriers = &image_barrier;
+
+    dt_.cmdPipelineBarrier2(cmd_buffer_, &dependency_info);
+
+    EndCmd();
+    Submit();
+
+    image.layout_ = new_layout;
+}
+
 void Context::CopyBuffer(VkBuffer src_buffer, VkBuffer dst_buffer, const VkBufferCopy* region) {
     dt_.cmdCopyBuffer(cmd_buffer_, src_buffer, dst_buffer, 1, region);
+}
+
+void Context::CopyBufferToImage(VkBuffer buffer, const vct::Image& image, const VkBufferImageCopy* region) {
+    dt_.cmdCopyBufferToImage(cmd_buffer_, buffer, image, image.layout_, 1, region);
 }
 
 void Context::Dispatch(const vct::Pipeline& pipeline, const vct::DescriptorSet& descriptor_set) {

@@ -1,27 +1,34 @@
+#include <vulkan/vulkan_core.h>
 #include "context.h"
 #include "factory.h"
 
-int main() {
-    Context cx;
-    if (!cx.Setup()) return -1;
+void Test(Context& cx) {
+    vct::Image image(cx, VK_IMAGE_TYPE_2D, VK_FORMAT_R8G8B8A8_UINT, {8, 8, 1}, VK_IMAGE_USAGE_STORAGE_BIT);
+    cx.SetLayout(image, VK_IMAGE_LAYOUT_GENERAL);
+    vct::Buffer output(cx, 4096);
 
-    {
-        vct::DescriptorSet descriptor_set(cx);
-        vct::Buffer output(cx, 4096);
-        descriptor_set.Update(0, output);
-        vct::Pipeline pipeline(cx, descriptor_set.layout_, "simple.comp.spv");
+    vct::Buffer src(cx, 4096);
+    src.Set(0x33);
 
-        cx.BeginCmd();
-        cx.Dispatch(pipeline, descriptor_set);
-        cx.EndCmd();
-        cx.Submit();
+    vct::DescriptorSet descriptor_set(cx);
+    descriptor_set.Update(0, output);
+    descriptor_set.Update(1, image);
+    vct::Pipeline pipeline(cx, descriptor_set.layout_, "simple.comp.spv");
 
-        output.Print(64);
-    }
+    cx.BeginCmd();
+    VkBufferImageCopy region = {0, 0, 0, {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, {0, 0, 0}, {2, 2, 1}};
+    cx.CopyBufferToImage(src, image, &region);
+    cx.EndCmd();
+    cx.Submit();
 
-    // vct::Buffer src(cx, 4096);
+    cx.BeginCmd();
+    cx.Dispatch(pipeline, descriptor_set);
+    cx.EndCmd();
+    cx.Submit();
+
+    output.Print(64);
+
     // vct::Buffer dst(cx, 4096);
-    // dst.Set(0);
 
     // uint32_t *src_ptr = static_cast<uint32_t *>(src.Map());
     // src_ptr[0] = 0x11111111;
@@ -40,6 +47,12 @@ int main() {
     // cx.Submit();
 
     // dst.Print(128);
+}
+
+int main() {
+    Context cx;
+    if (!cx.Setup()) return -1;
+    Test(cx);
 
     return 0;
 }

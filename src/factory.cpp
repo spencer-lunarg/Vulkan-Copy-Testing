@@ -63,6 +63,59 @@ void Buffer::Print(uint32_t bytes) {
     Unmap();
 }
 
+Image::Image(const Context& cx, VkImageType image_type, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)
+    : cx_(cx), layout_(VK_IMAGE_LAYOUT_UNDEFINED) {
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.flags = 0;
+    image_ci.imageType = image_type;
+    image_ci.format = format;
+    image_ci.extent = extent;
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = (usage | (VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
+    image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    image_ci.queueFamilyIndexCount = 0;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    cx_.dt_.createImage(&image_ci, nullptr, &handle_);
+
+    VkMemoryRequirements reqs;
+    cx_.dt_.getImageMemoryRequirements(handle_, &reqs);
+
+    VkMemoryAllocateInfo allocate_info = vku::InitStructHelper();
+    allocate_info.allocationSize = reqs.size;
+    allocate_info.memoryTypeIndex = cx_.GetHostVisibleMemoryIndex(reqs.memoryTypeBits);
+    cx_.dt_.allocateMemory(&allocate_info, nullptr, &memory_);
+
+    cx_.dt_.bindImageMemory(handle_, memory_, 0);
+
+    VkImageViewCreateInfo image_view_ci = vku::InitStructHelper();
+    image_view_ci.flags = 0;
+    image_view_ci.image = handle_;
+    image_view_ci.format = format;
+    image_view_ci.viewType = (image_type == VK_IMAGE_TYPE_2D) ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_1D;
+    image_view_ci.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A};
+    image_view_ci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    cx_.dt_.createImageView(&image_view_ci, nullptr, &view_);
+}
+
+Image::~Image() {
+    if (memory_ != VK_NULL_HANDLE) {
+        cx_.dt_.freeMemory(memory_, nullptr);
+        memory_ = VK_NULL_HANDLE;
+    }
+    if (handle_ != VK_NULL_HANDLE) {
+        cx_.dt_.destroyImage(handle_, nullptr);
+        handle_ = VK_NULL_HANDLE;
+    }
+    if (view_ != VK_NULL_HANDLE) {
+        cx_.dt_.destroyImageView(view_, nullptr);
+        handle_ = VK_NULL_HANDLE;
+    }
+}
+
 DescriptorSet::DescriptorSet(const Context& cx) : cx_(cx) {
     VkDescriptorPoolSize pool_sizes[2] = {
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1},
@@ -113,6 +166,18 @@ void DescriptorSet::Update(uint32_t binding, VkBuffer buffer, VkDeviceSize range
     write_ds.descriptorCount = 1;
     write_ds.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     write_ds.pBufferInfo = &buffer_info;
+    cx_.dt_.updateDescriptorSets(1, &write_ds, 0, nullptr);
+}
+
+void DescriptorSet::Update(uint32_t binding, vct::Image& image) {
+    VkDescriptorImageInfo image_info = {VK_NULL_HANDLE, image.view_, image.layout_};
+    VkWriteDescriptorSet write_ds = vku::InitStructHelper();
+    write_ds.dstSet = handle_;
+    write_ds.dstBinding = binding;
+    write_ds.dstArrayElement = 0;
+    write_ds.descriptorCount = 1;
+    write_ds.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    write_ds.pImageInfo = &image_info;
     cx_.dt_.updateDescriptorSets(1, &write_ds, 0, nullptr);
 }
 

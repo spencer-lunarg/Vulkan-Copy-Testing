@@ -2,6 +2,7 @@
 #include "VkBootstrap.h"
 
 namespace vct {
+class Image;
 class Pipeline;
 class DescriptorSet;
 }  // namespace vct
@@ -17,7 +18,9 @@ class Context {
     void BeginCmd();
     void EndCmd();
     void Submit();
+    void SetLayout(vct::Image& image, VkImageLayout new_layout);
     void CopyBuffer(VkBuffer src_buffer, VkBuffer dst_buffer, const VkBufferCopy* region);
+    void CopyBufferToImage(VkBuffer buffer, const vct::Image& image, const VkBufferImageCopy* region);
     void Dispatch(const vct::Pipeline& pipeline, const vct::DescriptorSet& descriptor_set);
 
     vkb::Instance instance_;

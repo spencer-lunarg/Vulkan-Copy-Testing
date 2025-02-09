@@ -1,0 +1,13 @@
+#version 450
+layout(set = 0, binding = 0, std430) buffer SSBO {
+    uvec4 data[];
+};
+
+layout(set = 0, binding = 1, Rgba8ui) uniform uimage2D storageImage;
+
+void main() {
+    data[0] = imageLoad(storageImage, ivec2(0, 0));
+    data[1] = imageLoad(storageImage, ivec2(0, 1));
+    data[2] = imageLoad(storageImage, ivec2(1, 0));
+    data[3] = imageLoad(storageImage, ivec2(1, 1));
+}
