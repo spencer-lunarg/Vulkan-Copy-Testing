@@ -1,6 +1,11 @@
 #include <vulkan/vulkan_core.h>
 #include "VkBootstrap.h"
 
+namespace vct {
+class Pipeline;
+class DescriptorSet;
+}  // namespace vct
+
 class Context {
   public:
     Context();
@@ -13,6 +18,7 @@ class Context {
     void EndCmd();
     void Submit();
     void CopyBuffer(VkBuffer src_buffer, VkBuffer dst_buffer, const VkBufferCopy* region);
+    void Dispatch(const vct::Pipeline& pipeline, const vct::DescriptorSet& descriptor_set);
 
     vkb::Instance instance_;
     vkb::InstanceDispatchTable instance_dt_;

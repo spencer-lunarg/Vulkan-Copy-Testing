@@ -1,4 +1,5 @@
 #include "context.h"
+#include <vulkan/vulkan_core.h>
 #include "factory.h"
 #include <cstdint>
 #include <iostream>
@@ -34,7 +35,12 @@ bool Context::Setup() {
     auto system_info = system_info_ret.value();
 
     vkb::PhysicalDeviceSelector selector{instance_};
-    auto phys_ret = selector.set_minimum_version(1, 3).defer_surface_initialization().select();
+    selector.set_minimum_version(1, 3).defer_surface_initialization();
+    selector.add_required_extension("VK_KHR_maintenance5");
+    VkPhysicalDeviceMaintenance5Features maintenance5_features = vku::InitStructHelper();
+    maintenance5_features.maintenance5 = true;
+    selector.add_required_extension_features(maintenance5_features);
+    auto phys_ret = selector.select();
     if (!phys_ret) {
         std::cerr << phys_ret.error().message() << "\n";
         return false;
@@ -114,4 +120,11 @@ void Context::Submit() {
 
 void Context::CopyBuffer(VkBuffer src_buffer, VkBuffer dst_buffer, const VkBufferCopy* region) {
     dt_.cmdCopyBuffer(cmd_buffer_, src_buffer, dst_buffer, 1, region);
+}
+
+void Context::Dispatch(const vct::Pipeline& pipeline, const vct::DescriptorSet& descriptor_set) {
+    dt_.cmdBindPipeline(cmd_buffer_, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    dt_.cmdBindDescriptorSets(cmd_buffer_, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.layout_, 0, 1, &descriptor_set.handle_, 0,
+                              nullptr);
+    dt_.cmdDispatch(cmd_buffer_, 1, 1, 1);
 }

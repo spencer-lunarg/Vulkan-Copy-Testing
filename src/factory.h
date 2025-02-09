@@ -1,4 +1,5 @@
 #include <vulkan/vulkan_core.h>
+#include <string>
 
 class Context;
 
@@ -21,4 +22,31 @@ class Buffer {
     VkDeviceMemory memory_;
     uint32_t size_;
 };
+
+class DescriptorSet {
+  public:
+    DescriptorSet(const Context& cx);
+    ~DescriptorSet();
+    operator VkDescriptorSet() const { return handle_; }
+
+    void Update(uint32_t binding, VkBuffer buffer, VkDeviceSize range = VK_WHOLE_SIZE);
+
+    const Context& cx_;
+    VkDescriptorSet handle_;
+    VkDescriptorPool pool_;
+    VkDescriptorSetLayout layout_;
+};
+
+// Compute pipeline
+class Pipeline {
+  public:
+    Pipeline(const Context& cx, VkDescriptorSetLayout dsl, const std::string& shader);
+    ~Pipeline();
+    operator VkPipeline() const { return handle_; }
+
+    const Context& cx_;
+    VkPipeline handle_;
+    VkPipelineLayout layout_;
+};
+
 }  // namespace vct
